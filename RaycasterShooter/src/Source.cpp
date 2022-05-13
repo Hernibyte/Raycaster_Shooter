@@ -10,6 +10,10 @@
 #define P3 3*PI/2
 #define DR 0.0174533 // one degree in radians
 
+typedef struct {
+	int w, a, d, s;
+} ButtonKeys; ButtonKeys userKeys;
+
 float player_x, player_y, player_dx, player_dy, player_a; // player position
 
 void drawPlayer() {
@@ -26,14 +30,6 @@ void drawPlayer() {
 	glEnd();
 }
 
-void movePlayer(unsigned char key, int x, int y) {
-	if (key == 'a') { player_a -= 0.1; if (player_a < 0) { player_a += 2 * PI; } player_dx = cos(player_a) * 5; player_dy = sin(player_a) * 5; }
-	if (key == 'd') { player_a += 0.1; if (player_a > 2 * PI) { player_a -= 2 * PI; } player_dx = cos(player_a) * 5; player_dy = sin(player_a) * 5; }
-	if (key == 'w') { player_x += player_dx; player_y += player_dy; }
-	if (key == 's') { player_x -= player_dx; player_y -= player_dy; }
-	glutPostRedisplay();
-}
-
 int mapX = 8, mapY = 8, mapS = 64;
 int map[] = {
 	1, 1, 1, 1, 1, 1, 1, 1,
@@ -45,6 +41,28 @@ int map[] = {
 	1, 0, 0, 0, 0, 0, 0, 1,
 	1, 1, 1, 1, 1, 1, 1, 1
 };
+
+void movePlayer(float fps) {
+	if (userKeys.a == 1) { player_a -= 0.003 * fps; if (player_a < 0) { player_a += 2 * PI; } player_dx = cos(player_a) * 5; player_dy = sin(player_a) * 5; }
+	if (userKeys.d == 1) { player_a += 0.003 * fps; if (player_a > 2 * PI) { player_a -= 2 * PI; } player_dx = cos(player_a) * 5; player_dy = sin(player_a) * 5; }
+
+	int xo = 0; if (player_dx < 0) { xo = -20; }
+	else { xo = 20; }
+	int yo = 0; if (player_dy < 0) { yo = -20; }
+	else { yo = 20; }
+	int ipx = player_x / 64.0, ipx_add_xo = (player_x + xo) / 64.0, ipx_sub_xo = (player_x - xo) / 64.0;
+	int ipy = player_y / 64.0, ipy_add_yo = (player_y + yo) / 64.0, ipy_sub_yo = (player_y - yo) / 64.0;
+
+	if (userKeys.w == 1) {
+		if (map[ipy * mapX + ipx_add_xo] == 0) { player_x += player_dx * 0.05 * fps; }
+		if (map[ipy_add_yo * mapX + ipx] == 0) { player_y += player_dy * 0.05 * fps; }
+	}
+	if (userKeys.s == 1) {
+		if (map[ipy * mapX + ipx_sub_xo] == 0) { player_x -= player_dx * 0.05 * fps; }
+		if (map[ipy_sub_yo * mapX + ipx] == 0) { player_y -= player_dy * 0.05 * fps; }
+	}
+	glutPostRedisplay();
+}
 
 void drawMap2D() {
 	int x, y, xo, yo;
@@ -112,7 +130,14 @@ void drawRays2D() {
 	}
 }
 
+float frame1, frame2, gameFPS;
+
 void display() {
+	// frames per second
+	frame2 = glutGet(GLUT_ELAPSED_TIME); gameFPS = (frame2 - frame1); frame1 = glutGet(GLUT_ELAPSED_TIME);
+
+	movePlayer(gameFPS);
+
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	drawMap2D();
@@ -129,13 +154,36 @@ void init() {
 	player_x = 300, player_y = 300; player_dx = cos(player_a) * 5; player_dy = sin(player_a) * 5;
 }
 
+void buttonDown(unsigned char key, int x, int y) {
+	if (key == 'a') { userKeys.a = 1; }
+	if (key == 'd') { userKeys.d = 1; }
+	if (key == 'w') { userKeys.w = 1; }
+	if (key == 's') { userKeys.s = 1; }
+	glutPostRedisplay();
+}
+
+void buttonUp(unsigned char key, int x, int y) {
+	if (key == 'a') { userKeys.a = 0; }
+	if (key == 'd') { userKeys.d = 0; }
+	if (key == 'w') { userKeys.w = 0; }
+	if (key == 's') { userKeys.s = 0; }
+	glutPostRedisplay();
+}
+
+void resize(int w, int h) {
+	glutReshapeWindow(1024, 512);
+}
+
 int main(int argc, char* argv[]) {
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
 	glutInitWindowSize(WIDTH, HEIGHT);
+	glutInitWindowPosition(200, 200);
 	glutCreateWindow("Raycaster Shooter");
 	init();
 	glutDisplayFunc(display);
-	glutKeyboardFunc(movePlayer);
+	glutReshapeFunc(resize);
+	glutKeyboardFunc(buttonDown);
+	glutKeyboardUpFunc(buttonUp);
 	glutMainLoop();
 }
